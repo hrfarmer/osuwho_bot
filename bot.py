@@ -25,25 +25,28 @@ db = Database()
 client = Client.from_client_credentials(
     client_id, client_secret, redirect_url)
 
+
 def truncate(n, decimals=0):
     n = n*100
     multiplier = 10 ** decimals
     return int(n * multiplier) / multiplier
 
+
 async def openai_request(message):
     response = openai.Completion.create(
-    model="text-davinci-002",
-    prompt=message,
-    temperature=0.7,
-    max_tokens=175,
-    top_p=1,
-    frequency_penalty=0,
-    presence_penalty=0
-)
+        model="text-davinci-002",
+        prompt=message,
+        temperature=0.7,
+        max_tokens=175,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
+    )
     text = response['choices'][0]['text']
     return text
 
 printable = set(string.printable)
+
 
 class Bot(commands.Bot):
 
@@ -51,7 +54,8 @@ class Bot(commands.Bot):
         # Initialise our Bot with our access token, prefix and a list of channels to join on boot...
         # prefix can be a callable, which returns a list of strings or a string...
         # initial_channels can also be a callable which returns a list of strings...
-        super().__init__(token=twitch_token, prefix='?', initial_channels=['btmc'])
+        super().__init__(token=twitch_token,
+                         prefix='?', initial_channels=['btmc'])
 
     async def event_ready(self):
         # Notify us when everything is ready!
@@ -71,9 +75,9 @@ class Bot(commands.Bot):
         # Since we have commands and are overriding the default `event_message`
         # We must let the bot know we want to handle and invoke our commands...
         await self.handle_commands(message)
-       
 
-#Commands
+
+# Commands
 
 
     @commands.command()
@@ -83,17 +87,17 @@ class Bot(commands.Bot):
             exit()
         else:
             await ctx.send("PogO YOU ARE NOT WORTHY ENOUGH TO MURDER ME")
-    
+
     @commands.command()
     async def dink(self, ctx: commands.Context):
         await ctx.send("DinkDonk DONK")
-    
+
     @commands.command()
     async def repeat(self, ctx: commands.Context):
         message = ctx.message.content
         message = message[8:]
         await ctx.send(message)
-    
+
     @commands.command()
     async def roll(self, ctx: commands.Context):
         number = random.randint(1, 1000)
@@ -110,23 +114,23 @@ class Bot(commands.Bot):
         await asyncio.sleep(1)
         length = len(text)
         if length > 500:
-            text1 = text[:475]
-            text2 = text[475:]
-            await ctx.send(text1)
-            print("sent text1")
-            await asyncio.sleep(1.5)
-            await ctx.send(text2)
-            print("sent text2")
+            n = 470
+            split_text = [text[i:i+n] for i in range(0, len(text), n)]
+            for _text in split_text:
+                await ctx.send(_text)
+                await asyncio.sleep(1.5)
+
         else:
             await ctx.send(text)
             print(text)
-        
+
     @commands.command()
     async def link(self, ctx: commands.Context):
         self.twitch_username = ctx.message.author.name
 
         self.osu_username = ctx.message.content
-        self.osu_username.join(filter(lambda x: x in printable, self.osu_username))
+        self.osu_username.join(
+            filter(lambda x: x in printable, self.osu_username))
         self.osu_username = self.osu_username[6:]
 
         try:
@@ -135,7 +139,6 @@ class Bot(commands.Bot):
                 await ctx.send("NOPERS Tssk you can't link more than one account (do ?unlink to remove previous account)")
         except:
             pass
-
 
         try:
             self.yep = await client.get_user(key="username", user=self.osu_username)
@@ -146,16 +149,16 @@ class Bot(commands.Bot):
             db.add_username(self.twitch_username, self.osu_username)
         except:
             return await ctx.send("Failed to link (ping hr man)")
-        
+
         await ctx.send(f"Linked {self.twitch_username} to {self.osu_username}")
-    
+
     @commands.command()
     async def checkuser(self, ctx: commands.Context):
         self.twitch_username = ctx.message.author.name
 
         self.osu_username = db.return_username(self.twitch_username)
         await ctx.send(f"@{self.twitch_username}, your linked osu! username is {self.osu_username[1]}")
-    
+
     @commands.command()
     async def unlink(self, ctx: commands.Context):
         self.twitch_username = ctx.message.author.name
@@ -206,6 +209,7 @@ class Bot(commands.Bot):
                 s = f"@{ctx.message.author.name} (FAILED) {score.beatmapset.artist} - {score.beatmapset.title} [{score.beatmap.version}]: {score.score} | [{score.statistics.count_300}/{score.statistics.count_100}/{score.statistics.count_50}/{score.statistics.count_miss}] | {accuracy}% | https://osu.ppy.sh/b/{score.beatmap.id}"
                 print(s)
                 await ctx.send(s)
+
 
 bot = Bot()
 bot.run()
