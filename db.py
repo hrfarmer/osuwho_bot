@@ -17,3 +17,8 @@ class Database:
         cursor = self.cursor
         cursor.execute(f"SELECT * FROM osu_usernames WHERE twitch_username = '{twitch_user}'")
         return cursor.fetchone()
+    
+    def remove_username(self, twitch_user):
+        cursor = self.cursor
+        cursor.execute(f"DELETE FROM osu_usernames WHERE twitch_username = '{twitch_user}'")
+        self.conn.commit()

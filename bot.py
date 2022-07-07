@@ -25,7 +25,6 @@ db = Database()
 client = Client.from_client_credentials(
     client_id, client_secret, redirect_url)
 
-
 def truncate(n, decimals=0):
     n = n*100
     multiplier = 10 ** decimals
@@ -37,13 +36,14 @@ async def openai_request(message):
         model="text-davinci-002",
         prompt=message,
         temperature=0.7,
-        max_tokens=175,
+        max_tokens=300,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0
     )
     text = response['choices'][0]['text']
     return text
+
 
 printable = set(string.printable)
 
@@ -104,8 +104,12 @@ class Bot(commands.Bot):
         await ctx.send(f"@{ctx.message.author.name}, you rolled {number}")
 
     @commands.command()
+    async def aiwebsite(self, ctx: commands.Context):
+        await ctx.send(f"@{ctx.message.author.name}, https://beta.openai.com/playground?mode=complete")
+
+    @commands.command()
     async def ai(self, ctx: commands.Context):
-        await ctx.send("ppHop Loading")
+        await ctx.send("ppHop Loading (other commands may or may not run after the ai has responded, resend if it doesn't)")
         message = ctx.message.content
         message.join(filter(lambda x: x in printable, message))
         message = message[4:]
@@ -113,15 +117,15 @@ class Bot(commands.Bot):
         text = await openai_request(message)
         await asyncio.sleep(1)
         length = len(text)
-        if length > 500:
-            n = 470
+        if length > 475:
+            n = 450
             split_text = [text[i:i+n] for i in range(0, len(text), n)]
             for _text in split_text:
-                await ctx.send(_text)
+                await ctx.send(f"@{ctx.message.author.name}, {_text}")
                 await asyncio.sleep(1.5)
 
         else:
-            await ctx.send(text)
+            await ctx.send(f"@{ctx.message.author.name}, {text}")
             print(text)
 
     @commands.command()
@@ -143,7 +147,7 @@ class Bot(commands.Bot):
         try:
             self.yep = await client.get_user(key="username", user=self.osu_username)
         except:
-            return await ctx.send("Either you did not enter a username or the username entered is incorrect/does not exist.")
+            return await ctx.send("This is not a valid account")
 
         try:
             db.add_username(self.twitch_username, self.osu_username)
@@ -155,13 +159,23 @@ class Bot(commands.Bot):
     @commands.command()
     async def checkuser(self, ctx: commands.Context):
         self.twitch_username = ctx.message.author.name
-
         self.osu_username = db.return_username(self.twitch_username)
+
+        if self.osu_username == None:
+            return await ctx.send("You aren't linked to an osu account!")
+
         await ctx.send(f"@{self.twitch_username}, your linked osu! username is {self.osu_username[1]}")
 
     @commands.command()
     async def unlink(self, ctx: commands.Context):
         self.twitch_username = ctx.message.author.name
+        try:
+            self.osu_username = db.return_username(self.twitch_username)
+        except:
+            return await ctx.send("You aren't linked to an account")
+        
+        db.remove_username(self.twitch_username)
+        await ctx.send(f"Unlinked {self.twitch_username} from {self.osu_username[1]}")
 
     @commands.command()
     async def rs(self, ctx: commands.Context):
