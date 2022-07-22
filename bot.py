@@ -1,5 +1,8 @@
+from numpy import empty
+import twitchio
 from twitchio.ext import commands
 from osu import AsynchronousClient as Client
+from get_animes import GetAnime
 from db import Database
 from dotenv import load_dotenv
 import time
@@ -9,6 +12,7 @@ import asyncio
 import os
 import sys
 import random
+import cleverbotfree
 
 load_dotenv()
 
@@ -17,13 +21,17 @@ client_secret = os.getenv('client_secret')
 redirect_url = os.getenv('redirect_url')
 twitch_token = os.getenv('twitch_token')
 openai.api_key = os.getenv("OPENAI_API_KEY")
+MAL_TOKEN = os.getenv("MAL_TOKEN")
 
-messages = []
+banned_words = ['hentai', 'cum', 'penis', 'sex']
 
 db = Database()
+get_anime = GetAnime()
+animes, animes_lower = get_anime.collect_animes()
 
 client = Client.from_client_credentials(
     client_id, client_secret, redirect_url)
+
 
 def truncate(n, decimals=0):
     n = n*100
@@ -31,12 +39,21 @@ def truncate(n, decimals=0):
     return int(n * multiplier) / multiplier
 
 
+async def cbot_chat(input):
+    async with cleverbotfree.async_playwright() as p_w:
+        c_b = await cleverbotfree.CleverbotAsync(p_w)
+        user_input = input
+        bot = await c_b.single_exchange(user_input)
+
+        return bot
+
+
 async def openai_request(message):
     response = openai.Completion.create(
         model="text-davinci-002",
         prompt=message,
         temperature=1,
-        max_tokens=500,
+        max_tokens=300,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0
@@ -44,58 +61,17 @@ async def openai_request(message):
     ai_text = response['choices'][0]['text']
 
     content_filter = openai.Completion.create(
-      model="content-filter-alpha",
-      prompt = "<|endoftext|>"+ai_text+"\n--\nLabel:",
-      temperature=0,
-      max_tokens=1,
-      top_p=0,
-      logprobs=10
+        model="content-filter-alpha",
+        prompt="<|endoftext|>"+ai_text+"\n--\nLabel:",
+        temperature=0,
+        max_tokens=1,
+        top_p=0,
+        logprobs=10
     )
 
     output_label = content_filter["choices"][0]["text"]
-
-    # This is the probability at which we evaluate that a "2" is likely real
-    # vs. should be discarded as a false positive
-    toxic_threshold = -0.355
-
-    if output_label == "2":
-        # If the model returns "2", return its confidence in 2 or other output-labels
-        logprobs = response["choices"][0]["logprobs"]["top_logprobs"][0]
-
-        # If the model is not sufficiently confident in "2",
-        # choose the most probable of "0" or "1"
-        # Guaranteed to have a confidence for 2 since this was the selected token.
-        if logprobs["2"] < toxic_threshold:
-            logprob_0 = logprobs.get("0", None)
-            logprob_1 = logprobs.get("1", None)
-
-            # If both "0" and "1" have probabilities, set the output label
-            # to whichever is most probable
-            if logprob_0 is not None and logprob_1 is not None:
-                if logprob_0 >= logprob_1:
-                    output_label = "0"
-                    return ai_text
-                else:
-                    output_label = "1"
-                    return ai_text
-            # If only one of them is found, set output label to that one
-            elif logprob_0 is not None:
-                output_label = "0"
-                return ai_text
-            elif logprob_1 is not None:
-                output_label = "1"
-                return ai_text
-
-            # If neither "0" or "1" are available, stick with "2"
-            # by leaving output_label unchanged.
-
-    # if the most probable token is none of "0", "1", or "2"
-    # this should be set as unsafe
-    if output_label not in ["0", "1", "2"]:
-        output_label = "2"
-        return "This is too Susge for twitch chat"
-
-
+    print(f"AI generated text: {ai_text}")
+    return ai_text, output_label
 
 printable = set(string.printable)
 
@@ -108,6 +84,8 @@ class Bot(commands.Bot):
         # initial_channels can also be a callable which returns a list of strings...
         super().__init__(token=twitch_token,
                          prefix='?', initial_channels=['btmc'])
+        self.queue = asyncio.Queue()
+        self.invis = False
 
     async def event_ready(self):
         # Notify us when everything is ready!
@@ -116,17 +94,54 @@ class Bot(commands.Bot):
         print(f'User id is | {self.user_id}')
 
     async def event_message(self, message):
-        # Messages with echo set to True are messages sent by the bot...
-        # For now we just want to ignore them...
         if message.echo:
             return
+        # HOW TO SEND MESSAGES
+        # await bot.connected_channels[0].send('what')
+        if message.content.startswith('\x01ACTION @osuwho Which anime is more popular?'):
+            user_message = message.content[45:]
+            animes = user_message.split(' or ')
 
-        # Print the contents of our message to console...
+            anime1 = animes[0]
+            anime1.join(filter(lambda x: x in printable, anime1))
+            anime1 = anime1.lower()
+
+            anime2 = animes[1]
+            anime2.join(filter(lambda x: x in printable, anime2))
+            anime2 = anime2.lower()
+            anime2 = anime2[:-1]
+
+            anime1_rank = animes_lower.index(anime1)
+            anime2_rank = animes_lower.index(anime2)
+
+            time.sleep(2)
+
+            if anime1_rank > anime2_rank:
+                answer = "2"
+            else:
+                answer = "1"
+
+            if self.invis == False:
+                await bot.connected_channels[0].send(f"{answer}")
+                invis = True
+            else:
+                await bot.connected_channels[0].send(f"{answer} 🤯")
+                self.invis = False
+            # Print the contents of our message to console...
         print(f"{message.author.name}: {message.content}")
 
         # Since we have commands and are overriding the default `event_message`
         # We must let the bot know we want to handle and invoke our commands...
         await self.handle_commands(message)
+
+    async def send_message(self, ctx: commands.Context):
+        while True:
+            if self.queue.empty():
+                return
+            m = await self.queue.get()
+            print(m)
+            await ctx.send(m)
+            await asyncio.sleep(1.5)
 
 
 # Commands
@@ -141,8 +156,58 @@ class Bot(commands.Bot):
             await ctx.send("PogO YOU ARE NOT WORTHY ENOUGH TO MURDER ME")
 
     @commands.command()
+    async def ac(self, ctx: commands.Context):
+        await ctx.send("!ac")
+
+    @commands.command()
+    async def start(self, ctx: commands.Context):
+        await self.send_message(ctx)
+
+    @commands.command()
+    async def test(self, ctx: commands.Context):
+        message = '@osuwho Which anime is more popular? Princess Connect! Re: Dive or Persona 5 The Animation'
+        message = message[37:]
+        animes = message.split(' or ')
+        print(animes)
+
+    @commands.command()
+    async def search_anime_rank(self, ctx: commands.Context):
+        message = ctx.message.content[19:]
+        message_lower = message.lower()
+        print(message_lower)
+        try:
+            print(message)
+            anime_lower = animes_lower.index(message_lower)
+            anime_name = animes[anime_lower]
+        except ValueError:
+            return await ctx.send("That anime is not found")
+
+        anime_lower += 1
+        await ctx.send(f"{anime_name} is at rank {anime_lower}")
+
+    @commands.command()
+    async def random_animes(self, ctx: commands.Context):
+        r1 = random.randint(0, 1000)
+        r2 = random.randint(0, 1000)
+
+        anime1 = animes[r1]
+        anime2 = animes[r2]
+        r1 += 1
+        r2 += 2
+
+        await ctx.send(f"Anime 1: {anime1} Rank: {r1}")
+        await asyncio.sleep(1.5)
+        await ctx.send(f"Anime 2: {anime2} Rank: {r2}")
+
+    @commands.command()
+    async def list_animes(self, ctx: commands.Context):
+        for n, anime in enumerate(animes, 1):
+            print(f"{n}: {anime}")
+
+    @commands.command()
     async def dink(self, ctx: commands.Context):
-        await ctx.send("DinkDonk DONK")
+        await self.queue.put("DinkDonk DONK")
+        # await self.send_message(ctx)
 
     @commands.command()
     async def repeat(self, ctx: commands.Context):
@@ -160,15 +225,41 @@ class Bot(commands.Bot):
         await ctx.send(f"@{ctx.message.author.name}, https://beta.openai.com/playground?mode=complete")
 
     @commands.command()
+    async def cytube(self, ctx: commands.Context):
+        await ctx.send(f"@{ctx.message.author.name}, https://cytu.be/r/enyoters")
+
+    @commands.command()
+    async def cbot(self, ctx: commands.Context):
+        message = ctx.message.content
+        message.join(filter(lambda x: x in printable, message))
+        message = message[6:]
+
+        cbot_message = await cbot_chat(message)
+        await ctx.send(f";cbot {cbot_message}")
+
+    @commands.command()
     async def ai(self, ctx: commands.Context):
+
+        return await ctx.send("Sadge ran out of free trial for openai, no more generation sorry")
+        if ctx.message.author.name == "styx_e_clap":
+            return await ctx.send(f"@{ctx.message.author.name} fuck you you're banned FRICK")
+
         await ctx.send("ppHop Loading (other commands may or may not run after the ai has responded, resend if it doesn't)")
         message = ctx.message.content
         message.join(filter(lambda x: x in printable, message))
         message = message[4:]
 
-        text = await openai_request(message)
-        print(text)
+        text, content_filter = await openai_request(message)
+
+        if content_filter == "2":
+            text = "This is too Susge for twitch chat"
+
+        for banned_word in banned_words:
+            if banned_word in text.lower():
+                text = "This is too Susge for twitch chat"
+
         await asyncio.sleep(1)
+
         length = len(text)
         if length > 475:
             n = 450
@@ -179,7 +270,6 @@ class Bot(commands.Bot):
 
         else:
             await ctx.send(f"@{ctx.message.author.name}, {text}")
-            print(text)
 
     @commands.command()
     async def link(self, ctx: commands.Context):
@@ -226,7 +316,7 @@ class Bot(commands.Bot):
             self.osu_username = db.return_username(self.twitch_username)
         except:
             return await ctx.send("You aren't linked to an account")
-        
+
         db.remove_username(self.twitch_username)
         await ctx.send(f"Unlinked {self.twitch_username} from {self.osu_username[1]}")
 
@@ -279,5 +369,6 @@ class Bot(commands.Bot):
 
 
 bot = Bot()
-bot.run()
+asyncio.run(bot.run())
+
 # bot.run() is blocking and will stop execution of any below code here until stopped or closed.
