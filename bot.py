@@ -123,7 +123,7 @@ class Bot(commands.Bot):
 
             if self.invis == False:
                 await bot.connected_channels[0].send(f"{answer}")
-                invis = True
+                self.invis = True
             else:
                 await bot.connected_channels[0].send(f"{answer} 🤯")
                 self.invis = False
@@ -169,6 +169,11 @@ class Bot(commands.Bot):
         message = message[37:]
         animes = message.split(' or ')
         print(animes)
+
+    @commands.command()
+    async def reload_animes(self, ctx: commands.Context):
+        get_anime.collect_animes()
+        await ctx.send("Anime list reloaded")
 
     @commands.command()
     async def search_anime_rank(self, ctx: commands.Context):
