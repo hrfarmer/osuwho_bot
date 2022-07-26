@@ -1,17 +1,14 @@
 from dotenv import load_dotenv
 import requests
 import os
-import string
 
 load_dotenv()
-
-printable = set(string.printable)
 
 MAL_TOKEN = os.getenv("MAL_TOKEN")
 
 
 class GetAnime():
-    def __init__(self):
+    def collect_animes(self):
         self.headers = {
             'X-MAL-CLIENT-ID': MAL_TOKEN,
         }
@@ -20,10 +17,9 @@ class GetAnime():
             'limit': '500',
             'fields': "title,alternative_titles{en}"
         }
-
-    def collect_animes(self):
         self.animes = []
         self.animes_lower = []
+
         self.response = requests.get(
             'https://api.myanimelist.net/v2/anime/ranking', params=self.params, headers=self.headers)
         self.response = self.response.json()
@@ -42,3 +38,16 @@ class GetAnime():
             self.animes_lower.append(anime)
 
         return self.animes, self.animes_lower
+
+    def get_anime_list(self, user):
+        self.headers = {
+            'X-MAL-CLIENT-ID': MAL_TOKEN,
+        }
+        self.params = {
+            'sort': 'list_updated_at',
+            'fields': "title,alternative_titles{en},list_status"
+        }
+        self.response = requests.get(
+            'https://api.myanimelist.net/v2/users/' + user + '/animelist', params=self.params, headers=self.headers)
+        self.response = self.response.json()
+        return self.response

@@ -1,16 +1,15 @@
-from numpy import empty
-import twitchio
 from twitchio.ext import commands
 from osu import AsynchronousClient as Client
 from get_animes import GetAnime
+from last_fm import LastFM
 from db import Database
 from dotenv import load_dotenv
+from datetime import datetime
 import time
 import openai
 import string
 import asyncio
 import os
-import sys
 import random
 import cleverbotfree
 
@@ -25,8 +24,11 @@ MAL_TOKEN = os.getenv("MAL_TOKEN")
 
 banned_words = ['hentai', 'cum', 'penis', 'sex']
 
+
 db = Database()
+db.add_chatters()
 get_anime = GetAnime()
+lastfm = LastFM()
 animes, animes_lower = get_anime.collect_animes()
 
 client = Client.from_client_credentials(
@@ -88,45 +90,56 @@ class Bot(commands.Bot):
         self.invis = False
 
     async def event_ready(self):
-        # Notify us when everything is ready!
-        # We are logged in and ready to chat and use commands...
+
         print(f'Logged in as | {self.nick}')
         print(f'User id is | {self.user_id}')
 
     async def event_message(self, message):
         if message.echo:
             return
-        # HOW TO SEND MESSAGES
-        # await bot.connected_channels[0].send('what')
+
+        # FUNCTIONS THAT DONT START WITH PREFIX
         if message.content.startswith('\x01ACTION @osuwho Which anime is more popular?'):
-            user_message = message.content[45:]
-            animes = user_message.split(' or ')
+            if message.author.name == 'hrfarmer_' or message.author.name == 'sheepposubot':
+                user_message = message.content[45:]
+                animes = user_message.split(' or ')
 
-            anime1 = animes[0]
-            anime1.join(filter(lambda x: x in printable, anime1))
-            anime1 = anime1.lower()
+                anime1 = animes[0]
+                anime1.join(filter(lambda x: x in printable, anime1))
+                anime1 = anime1.lower()
 
-            anime2 = animes[1]
-            anime2.join(filter(lambda x: x in printable, anime2))
-            anime2 = anime2.lower()
-            anime2 = anime2[:-1]
+                anime2 = animes[1]
+                anime2.join(filter(lambda x: x in printable, anime2))
+                anime2 = anime2.lower()
+                anime2 = anime2[:-1]
 
-            anime1_rank = animes_lower.index(anime1)
-            anime2_rank = animes_lower.index(anime2)
+                time.sleep(2)
 
-            time.sleep(2)
+                try:
+                    anime1_rank = animes_lower.index(anime1)
+                    anime2_rank = animes_lower.index(anime2)
+                except ValueError:
+                    print('guess?')
+                    r = random.randint(1, 2)
+                    if self.invis == False:
+                        self.invis = True
+                        return await bot.connected_channels[0].send(f"{r}")
+                    else:
+                        self.invis = False
+                        return await bot.connected_channels[0].send(f"{r} 🤯")
 
-            if anime1_rank > anime2_rank:
-                answer = "2"
-            else:
-                answer = "1"
+                if anime1_rank > anime2_rank:
+                    answer = "2"
+                else:
+                    answer = "1"
 
-            if self.invis == False:
-                await bot.connected_channels[0].send(f"{answer}")
-                self.invis = True
-            else:
-                await bot.connected_channels[0].send(f"{answer} 🤯")
-                self.invis = False
+                if self.invis == False:
+                    await bot.connected_channels[0].send(f"{answer}")
+                    self.invis = True
+                else:
+                    await bot.connected_channels[0].send(f"{answer} 🤯")
+                    self.invis = False
+
             # Print the contents of our message to console...
         print(f"{message.author.name}: {message.content}")
 
@@ -155,20 +168,13 @@ class Bot(commands.Bot):
         else:
             await ctx.send("PogO YOU ARE NOT WORTHY ENOUGH TO MURDER ME")
 
-    @commands.command()
-    async def ac(self, ctx: commands.Context):
-        await ctx.send("!ac")
+    # @commands.command()
+    # async def ac(self, ctx: commands.Context):
+    #     await ctx.send("!ac")
 
     @commands.command()
     async def start(self, ctx: commands.Context):
         await self.send_message(ctx)
-
-    @commands.command()
-    async def test(self, ctx: commands.Context):
-        message = '@osuwho Which anime is more popular? Princess Connect! Re: Dive or Persona 5 The Animation'
-        message = message[37:]
-        animes = message.split(' or ')
-        print(animes)
 
     @commands.command()
     async def reload_animes(self, ctx: commands.Context):
@@ -192,22 +198,41 @@ class Bot(commands.Bot):
 
     @commands.command()
     async def random_animes(self, ctx: commands.Context):
-        r1 = random.randint(0, 1000)
-        r2 = random.randint(0, 1000)
+        try:
+            message = int(ctx.message.content[15:])
+            message += 1
+        except ValueError:
+            return await ctx.send("Put a number after the command")
 
-        anime1 = animes[r1]
-        anime2 = animes[r2]
-        r1 += 1
-        r2 += 2
+        if message > 6:
+            return await ctx.send("Limited to 5 at a time so you don't burn down chat Stare")
 
-        await ctx.send(f"Anime 1: {anime1} Rank: {r1}")
-        await asyncio.sleep(1.5)
-        await ctx.send(f"Anime 2: {anime2} Rank: {r2}")
+        for i in range(1, message):
+            r = random.randint(0, 1000)
+            anime = animes[r]
+            r += 1
+            await ctx.send(f"Anime: {anime} | Rank: {r}")
+            await asyncio.sleep(1.5)
 
     @commands.command()
     async def list_animes(self, ctx: commands.Context):
         for n, anime in enumerate(animes, 1):
             print(f"{n}: {anime}")
+
+    @commands.command()
+    async def recent_anime(self, ctx: commands.Context):
+        message = ctx.message.content[14:]
+        user_anime = get_anime.get_anime_list(message)
+
+        try:
+            title = user_anime['data'][0]['node']['alternative_titles']['en'] if user_anime['data'][
+                0]['node']['alternative_titles']['en'] != "" else user_anime['data'][0]['node']['title']
+            id = user_anime['data'][0]['node']['id']
+            score = user_anime['data'][0]['list_status']['score']
+        except:
+            return await ctx.send("User not found or something broke")
+
+        await ctx.send(f"{message}'s recent anime: {title} | Score: {score} 🌟 | Link: https://myanimelist.net/anime/{id}")
 
     @commands.command()
     async def dink(self, ctx: commands.Context):
@@ -244,8 +269,7 @@ class Bot(commands.Bot):
 
     @commands.command()
     async def ai(self, ctx: commands.Context):
-
-        return await ctx.send("Sadge ran out of free trial for openai, no more generation sorry")
+        return await ctx.send("Ai is gone because I have no more openai credits LULW")
         if ctx.message.author.name == "styx_e_clap":
             return await ctx.send(f"@{ctx.message.author.name} fuck you you're banned FRICK")
 
@@ -286,7 +310,7 @@ class Bot(commands.Bot):
         self.osu_username = self.osu_username[6:]
 
         try:
-            self.yep = db.return_username(self.twitch_username)
+            self.yep = db.return_osu_username(self.twitch_username)
             if self.yep != None:
                 await ctx.send("NOPERS Tssk you can't link more than one account (do ?unlink to remove previous account)")
         except:
@@ -298,7 +322,7 @@ class Bot(commands.Bot):
             return await ctx.send("This is not a valid account")
 
         try:
-            db.add_username(self.twitch_username, self.osu_username)
+            db.add_osu_username(self.twitch_username, self.osu_username)
         except:
             return await ctx.send("Failed to link (ping hr man)")
 
@@ -307,7 +331,7 @@ class Bot(commands.Bot):
     @commands.command()
     async def checkuser(self, ctx: commands.Context):
         self.twitch_username = ctx.message.author.name
-        self.osu_username = db.return_username(self.twitch_username)
+        self.osu_username = db.return_osu_username(self.twitch_username)
 
         if self.osu_username == None:
             return await ctx.send("You aren't linked to an osu account!")
@@ -318,11 +342,11 @@ class Bot(commands.Bot):
     async def unlink(self, ctx: commands.Context):
         self.twitch_username = ctx.message.author.name
         try:
-            self.osu_username = db.return_username(self.twitch_username)
+            self.osu_username = db.return_osu_username(self.twitch_username)
         except:
             return await ctx.send("You aren't linked to an account")
 
-        db.remove_username(self.twitch_username)
+        db.remove_osu_username(self.twitch_username)
         await ctx.send(f"Unlinked {self.twitch_username} from {self.osu_username[1]}")
 
     @commands.command()
@@ -333,7 +357,7 @@ class Bot(commands.Bot):
 
         if username == "":
             try:
-                username = db.return_username(ctx.message.author.name)
+                username = db.return_osu_username(ctx.message.author.name)
                 user = await client.get_user(key="username", user=username[1])
                 id = user.id
             except:
@@ -371,6 +395,117 @@ class Bot(commands.Bot):
                 s = f"@{ctx.message.author.name} (FAILED) {score.beatmapset.artist} - {score.beatmapset.title} [{score.beatmap.version}]: {score.score} | [{score.statistics.count_300}/{score.statistics.count_100}/{score.statistics.count_50}/{score.statistics.count_miss}] | {accuracy}% | https://osu.ppy.sh/b/{score.beatmap.id}"
                 print(s)
                 await ctx.send(s)
+
+    # lastfm commands
+
+    @commands.command()
+    async def lastfm_link(self, ctx: commands.Context):
+        self.twitch_username = ctx.message.author.name
+
+        self.lastfm_username = ctx.message.content
+        self.lastfm_username.join(
+            filter(lambda x: x in printable, self.lastfm_username))
+        self.lastfm_username = self.lastfm_username[13:]
+
+        if self.lastfm_username == "":
+            return await ctx.send("Your username can't be blank PogO")
+
+        try:
+            self.yep = db.return_lastfm_username(self.twitch_username)
+            if self.yep != None:
+                return await ctx.send("NOPERS Tssk you can't link more than one account (do ?lastfm_unlink to remove previous account)")
+        except:
+            pass
+
+        try:
+            db.add_lastfm_username(self.twitch_username, self.lastfm_username)
+        except:
+            return await ctx.send("Failed to link (ping hr man)")
+
+        await ctx.send(f"Linked {self.twitch_username} to {self.lastfm_username}")
+
+    @commands.command()
+    async def lastfm_checkuser(self, ctx: commands.Context):
+        self.twitch_username = ctx.message.author.name
+        self.lastfm_username = db.return_lastfm_username(self.twitch_username)
+
+        if self.lastfm_username == None:
+            return await ctx.send("You aren't linked to a LastFM account!")
+
+        await ctx.send(f"@{self.twitch_username}, your linked LastFM username is {self.lastfm_username[1]}")
+
+    @commands.command()
+    async def lastfm_unlink(self, ctx: commands.Context):
+        self.twitch_username = ctx.message.author.name
+        try:
+            self.lastfm_username = db.return_lastfm_username(
+                self.twitch_username)
+        except:
+            return await ctx.send("You aren't linked to an account")
+
+        db.remove_lastfm_username(self.twitch_username)
+        await ctx.send(f"Unlinked {self.twitch_username} from {self.lastfm_username[1]}")
+
+    @commands.command()
+    async def np(self, ctx: commands.Context):
+        username = ctx.message.content
+        username.join(filter(lambda x: x in printable, username))
+        username = username[4:]
+
+        if username == "":
+            try:
+                username = db.return_lastfm_username(ctx.message.author.name)
+            except:
+                return await ctx.send(f"Please link a username with ?lastfm_link")
+
+        recent_song = lastfm.getRecentSong(username)
+
+        try:
+            song_title = recent_song['recenttracks']['track'][0]['name']
+            song_artist = recent_song['recenttracks']['track'][0]['artist']['name']
+            song_url = recent_song['recenttracks']['track'][0]['url']
+        except:
+            return await ctx.send("Either that username is invalid, or something broke LULW")
+
+        await ctx.send(f"Now playing for {username[1]}: {song_artist} - {song_title} | {song_url}")
+
+    @commands.command()
+    async def lastfm_instructions(self, ctx: commands.Context):
+        await ctx.send(f"@{ctx.message.author.name}, https://pastebin.com/raw/ppReYSDm")
+
+    @commands.command()
+    async def lastfm_commands(self, ctx: commands.Context):
+        await ctx.send(f"@{ctx.message.author.name}, The commands for LastFM are ?np, ?lastfm_link, ?lastfm_unlink, ?lastfm_checkuser, and ?lastfm_instructions")
+
+    # chatstats commands
+    @commands.command()
+    async def messages_sent(self, ctx: commands.Context):
+        username = ctx.message.author.name.lower()
+        messages = db.return_messages(username)
+        if messages == None:
+            return await ctx.send(f"@{ctx.message.author.name} You are not on the chatter leaderboard pepePoint")
+
+        await ctx.send(f"{messages[0]} is rank {messages[2]} with {messages[1]} messages sent in BTMC (data from https://stats.streamelements.com/c/btmc )")
+
+    @commands.command()
+    async def refresh_stats(self, ctx: commands.Context):
+        if ctx.message.author.name == 'hrfarmer_' or ctx.message.author.name == 'osuwhotest':
+            await ctx.send("ppCircle refreshing chatstats")
+            db.add_chatters()
+            await ctx.send("ppL done")
+        else:
+            await ctx.send("PogO you don't have perms for this")
+
+    @commands.command()
+    async def lb(self, ctx: commands.Context):
+        if ctx.message.author.name == 'styx_e_clap':
+            return await ctx.send("FRICK im not letting you use this until theres a cooldown")
+        top10 = db.return_top10()
+        message = ""
+        for person in top10:
+            message = message + \
+                f"#{person[2]} {person[0]}: {person[1]} messages | "
+        await ctx.send(message)
 
 
 bot = Bot()
