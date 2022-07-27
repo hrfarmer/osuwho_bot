@@ -217,7 +217,7 @@ class Bot(commands.Bot):
     @commands.command()
     async def dink(self, ctx: commands.Context):
         await queue.put("DinkDonk DONK")
-        # await self.send_message(ctx)
+        # await self.send_message(ctxx)
 
     @commands.command()
     async def repeat(self, ctx: commands.Context):
