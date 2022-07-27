@@ -1,3 +1,4 @@
+from re import M
 from twitchio.ext import commands
 from osu import AsynchronousClient as Client
 from get_animes import GetAnime
@@ -7,6 +8,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 import time
 import openai
+import twitchio
 import string
 import asyncio
 import os
@@ -86,7 +88,6 @@ class Bot(commands.Bot):
         # initial_channels can also be a callable which returns a list of strings...
         super().__init__(token=twitch_token,
                          prefix='?', initial_channels=['btmc'])
-        self.queue = asyncio.Queue()
         self.invis = False
 
     async def event_ready(self):
@@ -95,6 +96,7 @@ class Bot(commands.Bot):
         print(f'User id is | {self.user_id}')
 
     async def event_message(self, message):
+        # asyncio.run(send_message())
         if message.echo:
             return
 
@@ -147,18 +149,8 @@ class Bot(commands.Bot):
         # We must let the bot know we want to handle and invoke our commands...
         await self.handle_commands(message)
 
-    async def send_message(self, ctx: commands.Context):
-        while True:
-            if self.queue.empty():
-                return
-            m = await self.queue.get()
-            print(m)
-            await ctx.send(m)
-            await asyncio.sleep(1.5)
-
 
 # Commands
-
 
     @commands.command()
     async def die(self, ctx: commands.Context):
@@ -236,7 +228,7 @@ class Bot(commands.Bot):
 
     @commands.command()
     async def dink(self, ctx: commands.Context):
-        await self.queue.put("DinkDonk DONK")
+        await queue.put("DinkDonk DONK")
         # await self.send_message(ctx)
 
     @commands.command()
@@ -509,6 +501,19 @@ class Bot(commands.Bot):
 
 
 bot = Bot()
+
+queue = asyncio.Queue()
+
+
+async def send_message():
+    while True:
+        m = await queue.get()
+        await bot.connected_channels[0].send(m)
+        await asyncio.sleep(1.5)
+
+        return
+
+asyncio.run_coroutine_threadsafe(send_message(), bot.loop)
 asyncio.run(bot.run())
 
 # bot.run() is blocking and will stop execution of any below code here until stopped or closed.
