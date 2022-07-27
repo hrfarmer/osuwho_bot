@@ -68,7 +68,7 @@ class Database:
             f"DELETE FROM lastfm_usernames WHERE twitch_username = '{twitch_user}'")
         self.conn.commit()
 
-# chatstats database stufff
+# chatstats database stuff
     def add_chatters(self):
         cursor = self.cursor
         try:
