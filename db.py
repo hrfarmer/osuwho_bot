@@ -1,6 +1,14 @@
-import sqlite3
-import json
+import mysql.connector
+import os
+from dotenv import load_dotenv
 from se_chatstats import ChatStats
+
+load_dotenv()
+mysqlhost = os.getenv("MYSQLHOST")
+mysqluser = os.getenv("MYSQLUSER")
+mysqlpassword = os.getenv("MYSQLPASSWORD")
+mysqlport = os.getenv("MYSQLPORT")
+mysqldatabase = os.getenv("MYSQLDATABASE")
 
 cs = ChatStats()
 
@@ -8,8 +16,17 @@ cs = ChatStats()
 class Database:
 
     def __init__(self):
-        self.conn = sqlite3.connect('database.db')
-        self.cursor = self.conn.cursor()
+        self.conn = mysql.connector.connect(
+            host=mysqlhost,
+            user=mysqluser,
+            password=mysqlpassword,
+            port=mysqlport,
+            database=mysqldatabase
+        )
+
+    @property
+    def cursor(self):
+        return self.conn.cursor()
 
 # osu database stuff
     def add_osu_username(self, twitch_user, osu_user):
@@ -66,7 +83,7 @@ class Database:
             messages = person['amount']
 
             cursor.execute(
-                f"INSERT INTO chatter_leaderboard (twitch_username, messages, rank) VALUES('{twitch_user}', '{messages}', {i})")
+                f"INSERT INTO chatter_leaderboard (twitch_username, messages, placement) VALUES ('{twitch_user}', '{messages}', '{i}')")
             self.conn.commit()
 
     def return_messages(self, twitch_user):
