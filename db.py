@@ -16,7 +16,7 @@ cs = ChatStats()
 class Database:
 
     def __init__(self):
-        print("connecting to sql")
+        print("Connecting to SQL server...")
         self.conn = mysql.connector.connect(
             host=mysqlhost,
             user=mysqluser,
@@ -24,6 +24,7 @@ class Database:
             port=mysqlport,
             database=mysqldatabase
         )
+        print("Done")
 
     @property
     def cursor(self):
