@@ -146,7 +146,6 @@ class Bot(commands.Bot):
 
 # Commands
 
-
     @commands.command()
     async def die(self, ctx: commands.Context):
         if ctx.message.author.name == "hrfarmer_" or ctx.message.author.name == 'osuwhotest':
