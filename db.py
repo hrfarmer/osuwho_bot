@@ -96,6 +96,3 @@ class Database:
         cursor = self.cursor
         cursor.execute(f"SELECT * FROM chatter_leaderboard LIMIT 0, 10")
         return cursor.fetchall()
-
-
-Database().return_top10()
