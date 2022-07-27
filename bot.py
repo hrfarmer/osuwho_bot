@@ -1,4 +1,3 @@
-from re import M
 from twitchio.ext import commands
 from osu import AsynchronousClient as Client
 from get_animes import GetAnime
