@@ -135,13 +135,7 @@ class Bot(commands.Bot):
                 else:
                     answer = "1"
 
-                if self.invis == False:
-                    await bot.connected_channels[0].send(f"{answer}")
-                    self.invis = True
-                else:
-                    await bot.connected_channels[0].send(f"{answer} 🤯")
-                    self.invis = False
-
+                await queue.put(answer)
             # Print the contents of our message to console...
         print(f"{message.author.name}: {message.content}")
 
@@ -152,6 +146,7 @@ class Bot(commands.Bot):
 
 # Commands
 
+
     @commands.command()
     async def die(self, ctx: commands.Context):
         if ctx.message.author.name == "hrfarmer_" or ctx.message.author.name == 'osuwhotest':
@@ -159,10 +154,6 @@ class Bot(commands.Bot):
             exit()
         else:
             await queue.put("PogO YOU ARE NOT WORTHY ENOUGH TO MURDER ME")
-
-    # @commands.command()
-    # async def ac(self, ctx: commands.Context):
-    #     await queue.put("!ac")
 
     @commands.command()
     async def start(self, ctx: commands.Context):
@@ -257,7 +248,7 @@ class Bot(commands.Bot):
         message = message[6:]
 
         cbot_message = await cbot_chat(message)
-        await queue.put(f";cbot {cbot_message}")
+        await queue.put(f"{cbot_message}")
 
     @commands.command()
     async def ai(self, ctx: commands.Context):
@@ -499,11 +490,6 @@ class Bot(commands.Bot):
                 f"#{person[2]} {person[0]}: {person[1]} messages | "
         await queue.put(message)
 
-    @commands.command()
-    async def spam(self, ctx: commands.Context):
-        for number in range(1, 11):
-            await queue.put(f"spam test {number}")
-
 
 bot = Bot()
 
@@ -511,9 +497,15 @@ queue = asyncio.Queue()
 
 
 async def send_message():
+    previous_mesasge = ""
     while True:
-        m = await queue.get()
-        await bot.connected_channels[0].send(m)
+        message = await queue.get()
+        if message == previous_mesasge:
+            message = message + "ㅤ"
+
+        await bot.connected_channels[0].send(message)
+        print(f"osuWHO: {message}")
+        previous_mesasge = message
         await asyncio.sleep(1.5)
 
 asyncio.run_coroutine_threadsafe(send_message(), bot.loop)
