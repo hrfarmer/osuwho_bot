@@ -16,6 +16,7 @@ load_dotenv()
 
 client_id = os.getenv('client_id')
 client_secret = os.getenv('client_secret')
+channel = os.getenv('channel')
 redirect_url = os.getenv('redirect_url')
 twitch_token = os.getenv('twitch_token')
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -84,7 +85,7 @@ class Bot(commands.Bot):
         # prefix can be a callable, which returns a list of strings or a string...
         # initial_channels can also be a callable which returns a list of strings...
         super().__init__(token=twitch_token,
-                         prefix='?', initial_channels=['btmc'])
+                         prefix='?', initial_channels=[channel])
         self.invis = False
 
     async def event_ready(self):
