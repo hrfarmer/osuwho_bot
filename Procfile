@@ -1,1 +1,0 @@
-command: python bot.py

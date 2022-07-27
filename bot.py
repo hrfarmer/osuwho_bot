@@ -4,10 +4,8 @@ from get_animes import GetAnime
 from last_fm import LastFM
 from db import Database
 from dotenv import load_dotenv
-from datetime import datetime
 import time
 import openai
-import twitchio
 import string
 import asyncio
 import os
