@@ -227,6 +227,8 @@ class Bot(commands.Bot):
     @commands.command()
     async def roll(self, ctx: commands.Context):
         number = random.randint(1, 1000)
+        if number == 727:
+            return await queue.put(f"@{ctx.message.author.name}, you rolled 727 WHEN YOU FUCKING SEE IT WYSI WYSI WYSI WYSI")
         await queue.put(f"@{ctx.message.author.name}, you rolled {number}")
 
     @commands.command()
