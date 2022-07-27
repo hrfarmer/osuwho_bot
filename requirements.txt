@@ -1,6 +1,6 @@
 cleverbotfree==2.3.4
 openai==0.20.0
-osu.py==0.2.8a2
+osu.py==0.2.10
 python-dotenv==0.20.0
 requests==2.27.1
 twitchio==2.3.0
