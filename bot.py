@@ -21,7 +21,6 @@ redirect_url = os.getenv('redirect_url')
 twitch_token = os.getenv('twitch_token')
 openai.api_key = os.getenv("OPENAI_API_KEY")
 MAL_TOKEN = os.getenv("MAL_TOKEN")
-
 banned_words = ['hentai', 'cum', 'penis', 'sex']
 
 
@@ -87,6 +86,7 @@ class Bot(commands.Bot):
         super().__init__(token=twitch_token,
                          prefix='?', initial_channels=[channel])
         self.invis = False
+        self.previous_time = None
 
     async def event_ready(self):
 
@@ -144,6 +144,7 @@ class Bot(commands.Bot):
 
 # Commands
 
+
     @commands.command()
     async def die(self, ctx: commands.Context):
         if ctx.message.author.name == "hrfarmer_" or ctx.message.author.name == 'osuwhotest':
@@ -192,7 +193,6 @@ class Bot(commands.Bot):
             anime = animes[r]
             r += 1
             await queue.put(f"Anime: {anime} | Rank: {r}")
-            await asyncio.sleep(1.5)
 
     @commands.command()
     async def list_animes(self, ctx: commands.Context):
@@ -224,15 +224,6 @@ class Bot(commands.Bot):
         message = ctx.message.content
         message = message[8:]
         await queue.put(message)
-
-    @commands.command()
-    async def roll(self, ctx: commands.Context):
-        if ctx.message.author.name == 'hrfarmer_':
-            return await queue.put(f"@hrfarmer_, you rolled 727")
-        number = random.randint(1, 1000)
-        if number == 727:
-            return await queue.put(f"@{ctx.message.author.name}, you rolled 727 WHEN YOU FUCKING SEE IT WYSI WYSI WYSI WYSI")
-        await queue.put(f"@{ctx.message.author.name}, you rolled {number}")
 
     @commands.command()
     async def aiwebsite(self, ctx: commands.Context):
@@ -490,6 +481,19 @@ class Bot(commands.Bot):
             message = message + \
                 f"#{person[2]} {person[0]}: {person[1]} messages | "
         await queue.put(message)
+
+    @commands.command()
+    async def roll(self, ctx: commands.Context):
+        number = random.randint(1, 1000)
+        if self.previous_time == None:
+            self.previous_time = time.perf_counter()
+            return await queue.put(f"@{ctx.message.author.name}, you rolled {number}")
+
+        current_time = time.perf_counter()
+        if current_time - round(self.previous_time, 0) < 5:
+            return
+        await queue.put(f"@{ctx.message.author.name}, you rolled {number}")
+        self.previous_time = current_time
 
 
 bot = Bot()
