@@ -8,8 +8,10 @@ import time
 import openai
 import string
 import asyncio
+import requests
 import os
 import random
+import threading
 import cleverbotfree
 
 load_dotenv()
@@ -47,6 +49,23 @@ async def cbot_chat(input):
         bot = await c_b.single_exchange(user_input)
 
         return bot
+
+
+def online_check():
+    global live
+    while True:
+        r = requests.get(
+            "https://beta.decapi.me/twitch/uptime/btmc").text
+        if r == "btmc is offline":
+            live = False
+            time.sleep(30)
+        else:
+            live = True
+            time.sleep(30)
+
+
+online_thread = threading.Thread(target=online_check)
+online_thread.daemon = True
 
 
 async def openai_request(message):
@@ -94,7 +113,6 @@ class Bot(commands.Bot):
         print(f'User id is | {self.user_id}')
 
     async def event_message(self, message):
-        # asyncio.run(send_message())
         if message.echo:
             return
 
@@ -143,7 +161,6 @@ class Bot(commands.Bot):
 
 
 # Commands
-
 
     @commands.command()
     async def die(self, ctx: commands.Context):
@@ -478,8 +495,9 @@ class Bot(commands.Bot):
         top10 = db.return_top10()
         message = ""
         for person in top10:
+            name = person[0]
             message = message + \
-                f"#{person[2]} {person[0]}: {person[1]} messages | "
+                f"#{person[2]} {name[:1]}'{name[1:]}: {person[1]} messages | "
         await queue.put(message)
 
     @commands.command()
@@ -505,15 +523,22 @@ async def send_message():
     previous_mesasge = ""
     while True:
         message = await queue.get()
+
         if message == previous_mesasge:
             message = message + "ㅤ"
 
-        await bot.connected_channels[0].send(message)
-        print(f"osuWHO: {message}")
-        previous_mesasge = message
-        await asyncio.sleep(1.5)
+        if live == True:
+            print("deadge")
+            continue
+        else:
+            print("he is not live")
+            await bot.connected_channels[0].send(message)
+            print(f"osuWHO: {message}")
+            previous_mesasge = message
+            await asyncio.sleep(1.5)
 
 asyncio.run_coroutine_threadsafe(send_message(), bot.loop)
+online_thread.start()
 asyncio.run(bot.run())
 
 # bot.run() is blocking and will stop execution of any below code here until stopped or closed.

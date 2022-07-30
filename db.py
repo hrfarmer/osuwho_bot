@@ -30,7 +30,6 @@ class Database:
     def cursor(self):
         return self.conn.cursor()
 
-# osu database stuff
     def add_osu_username(self, twitch_user, osu_user):
         cursor = self.cursor
         cursor.execute(
